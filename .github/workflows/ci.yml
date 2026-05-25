@@ -4,24 +4,27 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # trigger manual dari GitHub UI
+  workflow_dispatch:
 
 jobs:
   train:
     runs-on: ubuntu-latest
 
+    env:
+      DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
+      MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
+      MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
+
     steps:
-      # 1. Checkout repository
       - name: Run actions/checkout@v3
         uses: actions/checkout@v3
 
-      # 2. Setup Python 3.12.7
       - name: Set up Python 3.12.7
         uses: actions/setup-python@v4
         with:
           python-version: "3.12.7"
 
-      # 3. Cek environment
       - name: Check Env
         run: |
           python --version
@@ -29,35 +32,21 @@ jobs:
           echo "Working directory: $(pwd)"
           ls -la
 
-      # 4. Install dependencies
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install mlflow==2.19.0 scikit-learn==1.5.2 pandas numpy matplotlib dagshub
 
-      # 5. Set MLflow Tracking URI ke DagsHub
       - name: Set MLflow Tracking URI
         run: |
           echo "MLFLOW_TRACKING_URI=https://dagshub.com/${{ secrets.DAGSHUB_USERNAME }}/${{ secrets.DAGSHUB_REPO_NAME }}.mlflow" >> $GITHUB_ENV
 
-      # 6. Run MLflow Project
       - name: Run mlflow project
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
-          MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           cd MLProject
           mlflow run . --env-manager=local
 
-      # 7. Get latest MLflow run_id
       - name: Get latest MLflow run_id
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
-          MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           python - <<'EOF'
           import mlflow, os
@@ -74,38 +63,30 @@ jobs:
                   print(f"Metrics      : {runs[0].data.metrics}")
           EOF
 
-      # 8. Install Python dependencies untuk upload artefak
       - name: Install Python dependencies
         run: pip install mlflow dagshub
 
-      # 9. Upload artefak ke GitHub (simpan di repo yang sama)
       - name: Upload to GitHub
-        env:
-          DAGSHUB_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
-          MLFLOW_TRACKING_USERNAME: ${{ secrets.DAGSHUB_USERNAME }}
-          MLFLOW_TRACKING_PASSWORD: ${{ secrets.DAGSHUB_TOKEN }}
         run: |
           python - <<'EOF'
-          import mlflow, os, shutil
+          import mlflow, os, json
 
           mlflow.set_tracking_uri(
             f"https://dagshub.com/{os.environ['DAGSHUB_USERNAME']}/{os.environ['DAGSHUB_REPO_NAME']}.mlflow"
           )
           client = mlflow.tracking.MlflowClient()
           exp = client.get_experiment_by_name("Diabetes Prediction - CI")
-          runs = client.search_runs(exp.experiment_id, order_by=["start_time DESC"], max_results=1)
-
-          if runs:
-              run_id = runs[0].info.run_id
-              local_dir = f"./artifacts_{run_id}"
-              client.download_artifacts(run_id, "", local_dir)
-              print(f"Artefak didownload ke: {local_dir}")
-              for f in os.listdir(local_dir):
-                  print(f" - {f}")
+          if exp:
+              runs = client.search_runs(exp.experiment_id, order_by=["start_time DESC"], max_results=1)
+              if runs:
+                  run_id = runs[0].info.run_id
+                  local_dir = f"./artifacts_{run_id}"
+                  client.download_artifacts(run_id, "", local_dir)
+                  print(f"Artefak didownload ke: {local_dir}")
+                  for f in os.listdir(local_dir):
+                      print(f" - {f}")
           EOF
 
-          # Commit artefak ke repo
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add artifacts_* || true
