@@ -48,7 +48,7 @@ jobs:
 
       - name: Get latest MLflow run_id
         run: |
-          python - <<'EOF'
+          python - <<'PYEOF'
           import mlflow, os
           mlflow.set_tracking_uri(
             f"https://dagshub.com/{os.environ['DAGSHUB_USERNAME']}/{os.environ['DAGSHUB_REPO_NAME']}.mlflow"
@@ -61,14 +61,14 @@ jobs:
                   print(f"Latest Run ID: {runs[0].info.run_id}")
                   print(f"Status       : {runs[0].info.status}")
                   print(f"Metrics      : {runs[0].data.metrics}")
-          EOF
+          PYEOF
 
       - name: Install Python dependencies
         run: pip install mlflow dagshub
 
       - name: Upload to GitHub
         run: |
-          python - <<'EOF'
+          python - <<'PYEOF'
           import mlflow, os, json
 
           mlflow.set_tracking_uri(
@@ -85,10 +85,34 @@ jobs:
                   print(f"Artefak didownload ke: {local_dir}")
                   for f in os.listdir(local_dir):
                       print(f" - {f}")
-          EOF
+          PYEOF
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add artifacts_* || true
           git diff --staged --quiet || git commit -m "CI: Upload MLflow artifacts [skip ci]"
           git push || true
+
+      - name: Build Docker Model
+        run: |
+          mlflow models build-docker \
+            --model-uri "models:/DiabetesPredictionModel_CI/latest" \
+            --name "${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction-ci" \
+            --env-manager local
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Tag Docker Image
+        run: |
+          docker tag \
+            ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction-ci:latest \
+            ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction-ci:${{ github.sha }}
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction-ci:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/diabetes-prediction-ci:${{ github.sha }}
