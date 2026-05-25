@@ -87,8 +87,10 @@ def train():
         f"https://dagshub.com/{DAGSHUB_USERNAME}/{DAGSHUB_REPO_NAME}.mlflow"
     )
     mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.sklearn.autolog(disable=True)
+    # end any active run from mlflow run . wrapper
+    if mlflow.active_run():
+        mlflow.end_run()
 
     X_train, X_test, y_train, y_test = load_data()
 
@@ -109,7 +111,7 @@ def train():
     best_model = grid_search.best_estimator_
     logger.info(f"Best params: {grid_search.best_params_}")
 
-    with mlflow.start_run(run_name="RandomForest_CI") as run:
+    with mlflow.start_run(run_name="RandomForest_CI", nested=True) as run:
         logger.info(f"Run ID: {run.info.run_id}")
 
         # Log params
