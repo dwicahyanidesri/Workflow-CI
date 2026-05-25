@@ -82,12 +82,11 @@ def load_data():
 # TRAINING + LOGGING
 # ============================================================
 def train():
-    # Init DagsHub — tracking URI diset otomatis
-    dagshub.init(
-        repo_owner=DAGSHUB_USERNAME,
-        repo_name=DAGSHUB_REPO_NAME,
-        mlflow=True,
+    # Set tracking URI langsung via env var (CI-friendly, tanpa dagshub.init interaktif)
+    tracking_uri = (
+        f"https://dagshub.com/{DAGSHUB_USERNAME}/{DAGSHUB_REPO_NAME}.mlflow"
     )
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(EXPERIMENT_NAME)
     mlflow.sklearn.autolog(disable=True)
 
