@@ -43,8 +43,9 @@ jobs:
 
       - name: Run mlflow project
         run: |
-          cd MLProject
-          python modelling.py
+          mlflow run MLProject \
+            --env-manager local \
+            --experiment-name "Diabetes Prediction - CI"
 
       - name: Get latest MLflow run_id
         run: |
