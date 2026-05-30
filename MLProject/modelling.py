@@ -1,16 +1,3 @@
-"""
-modelling.py — MLflow Project (Workflow CI)
-============================================================
-Script pelatihan model yang digunakan dalam MLflow Project
-untuk re-training otomatis via GitHub Actions CI.
-
-Dataset   : Diabetes Prediction Dataset (preprocessed)
-Model     : Random Forest Classifier + GridSearchCV
-Tracking  : MLflow via DagsHub (online)
-Author    : Dwi Cahyani Desri
-Version   : 2.0.0 (CI version)
-"""
-
 import os
 import json
 import logging
@@ -82,19 +69,19 @@ def load_data():
 # TRAINING + LOGGING
 # ============================================================
 def train():
-    # Set tracking URI langsung via env var (CI-friendly, tanpa dagshub.init interaktif)
+    
     tracking_uri = (
         f"https://dagshub.com/{DAGSHUB_USERNAME}/{DAGSHUB_REPO_NAME}.mlflow"
     )
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.sklearn.autolog(disable=True)
-    # end any active run from mlflow run . wrapper
+    
     if mlflow.active_run():
         mlflow.end_run()
 
     X_train, X_test, y_train, y_test = load_data()
 
-    # Hyperparameter tuning
+    
     param_grid = {
         "n_estimators"    : [100, 200],
         "max_depth"       : [8, 10, 15],
